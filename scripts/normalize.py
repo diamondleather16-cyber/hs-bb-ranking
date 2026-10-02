@@ -1,155 +1,83 @@
 from pathlib import Path
 import csv
 
-from normalize import load_school_aliases, normalize_school_name
-
-DATA_DIR = Path("data")
-OUTPUT_DIR = Path("output")
-OUTPUT_FILE = OUTPUT_DIR / "all_matches.csv"
-
-FIELDNAMES = [
-    "year",
-    "season",
-    "region",
-    "prefecture",
-    "tournament",
-    "round",
-    "date",
-    "team1",
-    "score1",
-    "team2",
-    "score2",
-    "source_url",
-    "note",
-]
+SCHOOLS_FILE = Path("master/schools.csv")
 
 
-def main():
-    OUTPUT_DIR.mkdir(exist_ok=True)
+def load_school_aliases():
+    """
+    schools.csv を読み込み、
+    別名 -> 正規学校名 の辞書を作る
+    """
+    aliases = {}
 
-    aliases = load_school_aliases()
-
-    csv_files = [
-        p for p in DATA_DIR.rglob("*.csv")
-        if p.name != "template.csv"
-    ]
-
-    rows = []
-
-    for path in sorted(csv_files):
-        with path.open(
-            "r",
-            encoding="utf-8-sig",
-            newline=""
-        ) as f:
-            reader = csv.DictReader(f)
-
-            if reader.fieldnames is None:
-                print(f"SKIP: ヘッダーなし {path}")
-                continue
-
-            missing = [
-                field for field in FIELDNAMES
-                if field not in reader.fieldnames
-            ]
-
-            if missing:
-                print(
-                    f"SKIP: 必須列不足 {path} -> "
-                    + ", ".join(missing)
-                )
-                continue
-
-            for row in reader:
-                if not any(
-                    (row.get(field) or "").strip()
-                    for field in FIELDNAMES
-                ):
-                    continue
-
-                # 学校名を正規化
-                row["team1"] = normalize_school_name(
-                    row["team1"],
-                    aliases
-                )
-
-                row["team2"] = normalize_school_name(
-                    row["team2"],
-                    aliases
-                )
-
-                row["_source_file"] = str(path)
-
-                rows.append(row)
-
-    # 重複除去
-    unique_rows = []
-    seen = set()
-
-    for row in rows:
-        game_key = (
-            row["year"],
-            row["season"],
-            row["prefecture"],
-            row["tournament"],
-            row["round"],
-            row["date"],
-            row["team1"],
-            row["score1"],
-            row["team2"],
-            row["score2"],
-        )
-
-        if game_key in seen:
-            continue
-
-        seen.add(game_key)
-        unique_rows.append(row)
-
-    # 並び順
-    unique_rows.sort(
-        key=lambda r: (
-            r["year"],
-            r["season"],
-            r["region"],
-            r["prefecture"],
-            r["tournament"],
-            r["date"],
-            r["round"],
-            r["team1"],
-            r["team2"],
-        )
-    )
-
-    output_fields = FIELDNAMES + ["_source_file"]
-
-    with OUTPUT_FILE.open(
-        "w",
+    with SCHOOLS_FILE.open(
+        "r",
         encoding="utf-8-sig",
         newline=""
     ) as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=output_fields
+        reader = csv.DictReader(f)
+
+        for row in reader:
+            canonical = row["canonical_name"].strip()
+
+            if not canonical:
+                continue
+
+            # 正規名そのもの
+            aliases[canonical] = canonical
+
+            # alias列
+            for key, value in row.items():
+                if not key.startswith("alias"):
+                    continue
+
+                alias = (value or "").strip()
+
+                if alias:
+                    aliases[alias] = canonical
+
+    return aliases
+
+
+def normalize_school_name(name, aliases):
+    """
+    学校名を正規化する
+    """
+    name = (name or "").strip()
+
+    if not name:
+        return ""
+
+    return aliases.get(name, name)
+
+
+def main():
+    aliases = load_school_aliases()
+
+    print("=" * 60)
+    print("学校名正規化テスト")
+    print("=" * 60)
+
+    test_names = [
+        "星稜",
+        "星稜高",
+        "星稜高校",
+        "金沢高校",
+        "富山商業",
+        "敦賀気比高",
+        "日本文理高校",
+        "上田西高",
+        "未登録高校",
+    ]
+
+    for name in test_names:
+        normalized = normalize_school_name(
+            name,
+            aliases
         )
 
-        writer.writeheader()
-
-        for row in unique_rows:
-            writer.writerow(
-                {
-                    field: row.get(field, "")
-                    for field in output_fields
-                }
-            )
-
-    print("=" * 60)
-    print("全国試合データ統合完了")
-    print(f"読込CSV数: {len(csv_files)}")
-    print(f"読込試合数: {len(rows)}")
-    print(f"重複除去後: {len(unique_rows)}")
-    print(f"出力先: {OUTPUT_FILE}")
-    print("=" * 60)
+        print(f"{name} -> {normalized}")
 
 
 if __name__ == "__main__":
