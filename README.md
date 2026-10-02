@@ -1,51 +1,57 @@
 # 高校野球 全国レーティングデータベース
 
-全国高校野球の試合結果を蓄積し、検査・統合・レーティング計算を行うためのデータベースです。
+全国高校野球の試合結果を蓄積し、検査・統合・レーティング計算を行うためのリポジトリです。
 
-## 目的
+## 基本方針
 
-以下の試合データを全国規模で管理します。
+GitHub上のCSVを正本とし、Excelは確認・分析・出力用とします。
 
-- 過去10年程度の地区大会以上の試合
-- 2025年春以降の各都道府県大会
-- 春季大会
-- 夏季大会
-- 秋季大会
-- 地区大会
-- 明治神宮大会
-- 選抜高校野球
-- 全国高校野球選手権
+処理順は以下です。
 
-最終的には全国の試合を統合し、各校のレーティングを計算します。
+1. 収集
+2. 検査
+3. 統合
+4. レーティング
 
----
+## ディレクトリ構成
 
-## データ構成
+- `data/` : 地区別の試合CSV
+- `master/` : 学校名・大会名・出典URLのマスター
+- `scripts/` : 検査・正規化・統合コード
+- `output/` : 統合CSVや将来のExcel出力
+- `.github/workflows/` : GitHub上での自動検査
 
-```text
-hs-bb-ranking/
-├─ data/
-│  ├─ 01_hokkaido/
-│  ├─ 02_tohoku/
-│  ├─ 03_kanto_tokyo/
-│  ├─ 04_tokai/
-│  ├─ 05_hokushinetsu/
-│  ├─ 06_kinki/
-│  ├─ 07_chugoku/
-│  ├─ 08_shikoku/
-│  ├─ 09_kyushu/
-│  └─ national/
-│
-├─ master/
-│  ├─ schools.csv
-│  ├─ tournaments.csv
-│  └─ sources.csv
-│
-├─ scripts/
-│  ├─ validate.py
-│  ├─ merge.py
-│  └─ rating.py
-│
-└─ output/
-   ├─ all_matches.csv
-   └─ rating.xlsx
+## 試合CSVの列
+
+`year,season,region,prefecture,tournament,round,date,team1,score1,team2,score2,source_url,note`
+
+## season
+
+- spring
+- summer
+- autumn
+- senbatsu
+- koshien
+- jingu
+
+## round
+
+- 1R
+- 2R
+- 3R
+- 4R
+- 5R
+- QF
+- SF
+- F
+
+## 最初の使い方
+
+まず `data/05_hokushinetsu/ishikawa_2025.csv` に実データを追加してください。
+その後、ローカル環境で以下を実行します。
+
+```bash
+python scripts/validate.py
+python scripts/merge.py
+```
+
